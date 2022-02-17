@@ -1,33 +1,42 @@
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");   
-const newToken = (user)=>{
-    return jwt.sign({user}, "")
-}
-const register = async(req, res)=>{
-    try{
-        let user = await User.findOne({email : req.body.email}).lean().exec();
-        if(user){
-            return res.status(404).send("User already exists");
-        }
-        user = await User.create(req.body);
-        const token = newToken(user);
-
-
-        return res.status(201).send(user);
-        
-    }catch(err){
-        return res.status(500).send({Error : err.message});
+const User = require("../models/user.model");
+const newToken = (user) => {
+  return jwt.sign({ user }, process.env.JWT_SECRET_KEY);
+};
+const register = async (req, res) => {
+  try {
+    let user = await User.findOne({ email: req.body.email }).lean().exec();
+    if (user) {
+      return res.status(400).send("User already exists");
     }
-}
+    user = await User.create(req.body);
+    const token = newToken(user);
 
-const login = async (req, res)=>{
-    try{
-        res.send("login")
-        
-    }catch(err){
-        return res.status(500).send({Error : err.message});
+    res.send({ user, token });
+  } catch (err) {
+    return res.status(500).send({ Error: err.message });
+  }
+};
+
+const login = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return res.status(400).send({ message: "Please try another email or password" });
     }
-}
 
-module.exports = {register, login}
+    const match = user.checkPassword(req.body.password);
+
+    if (!match) {
+      return res.status(400).send({ message: "Please try another email or password" });
+    }
+
+    const token = newToken(user);
+    return res.send({ user, token });
+  } catch (err) {
+    return res.status(500).send({ Error: err.message });
+  }
+};
+
+module.exports = { register, login };
